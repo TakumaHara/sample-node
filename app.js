@@ -1,5 +1,6 @@
 const express = require('express');
 const mysql = require('mysql');
+const session=require('express-session');
 const app = express();
 
 app.use(express.static('public'));
@@ -12,33 +13,44 @@ const connection = mysql.createConnection({
   database: 'samplenode'
 });
 
-// トップ画面に対応するルーティングです
-// URLと画面を表示するための処理を確認してください
+app.use(
+  session({
+    secret:'my_secret_key',
+    resave:false,
+    saveUninitialized:false,
+  })
+)
+
+app.use((req,res,next)=>{
+  if(req.session.userId===undefined){
+    console.log('ログインしていません');
+  }else{
+    console.log('ログインしています');
+  }
+  next();
+});
+
+
 app.get('/', (req, res) => {
   res.render('top.ejs');
 });
 
-// 一覧画面に対応するルーティングです
-// URLと画面を表示するための処理を確認してください
+
 app.get('/list', (req, res) => {
   connection.query(
     'SELECT * FROM articles',
     (error, results) => {
-      // EJSファイルに渡すデータとプロパティ名を確認してください
       res.render('list.ejs', { articles: results });
     }
   );
 });
 
-// 閲覧画面に対応するルーティングです
-// URLと画面を表示するための処理を確認してください
 app.get('/article/:id', (req, res) => {
   const id = req.params.id;
   connection.query(
     'SELECT * FROM articles WHERE id = ?',
     [id],
     (error, results) => {
-      // EJSファイルに渡すデータとプロパティ名を確認してください
       res.render('article.ejs', { article: results[0] });
     }
   );
@@ -46,6 +58,26 @@ app.get('/article/:id', (req, res) => {
 
 app.get('/login',(req,res)=>{
   res.render('login.ejs');
+});
+
+app.post('/login',(req,res)=>{
+  const email=req.body.email;
+  connection.query(
+    'SELECT*FROM users WHERE email=?',
+    [email],
+    (error,results)=>{
+      if(results.length>0){
+        if(req.body.password===results[0].password){
+          req.session.userId=results[0].id;
+          res.redirect('/list');
+      }else{
+        res.redirect('/login');
+      }
+    }else{
+      res.redirect('/login');
+    }
+  }
+  );
 });
 
 app.listen(3000);
